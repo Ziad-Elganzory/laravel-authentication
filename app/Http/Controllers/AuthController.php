@@ -2,98 +2,146 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Services\AuthService;
+use App\Services\ApiResponseService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenExpiredException;
+use PHPOpenSourceSaver\JWTAuth\Exceptions\TokenInvalidException;
 
 class AuthController extends Controller
 {
     /**
+     * Inject AuthService via constructor
+     */
+    public function __construct(protected readonly AuthService $authService){}
+
+    /**
      * Register a new user
      */
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6|confirmed',
-        ]);
+        try {
+            $result = $this->authService->registerUser($request->only(['name', 'email', 'password']));
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            return ApiResponseService::success(
+                ['user' => $result['user']],
+                'User registered successfully',
+                201
+            );
+
+        } catch (\Exception $e) {
+            return ApiResponseService::serverError($e->getMessage());
         }
-
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-        ]);
-
-        return response()->json([
-            'message' => 'User successfully registered',
-            'user' => $user
-        ], 201);
     }
 
     /**
-     * Get a JWT via given credentials.
+     * Login user and return JWT token
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
-            'password' => 'required|string|min:6',
-        ]);
+        try {
+            $result = $this->authService->loginUser(
+                $request->email,
+                $request->password
+            );
 
-        if ($validator->fails()) {
-            return response()->json($validator->errors(), 422);
+            $tokenData = $this->authService->formatTokenResponse($result['token']);
+
+            return ApiResponseService::success(
+                $tokenData,
+                'Login successful'
+            );
+
+        } catch (\Exception $e) {
+            // Check if it's an invalid credentials error
+            if (str_contains($e->getMessage(), 'Invalid email or password')) {
+                return ApiResponseService::unauthorized($e->getMessage());
+            }
+            
+            return ApiResponseService::serverError($e->getMessage());
         }
+    }
 
-        // attempt() checks credentials and returns a token if valid
-        if (!$token = auth()->attempt($validator->validated())) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+    /**
+     * Get the authenticated user
+     */
+    public function me(Request $request)
+    {
+        try {
+            // Validate token first
+            $this->authService->validateToken($request->bearerToken());
+
+            // Get user details
+            $result = $this->authService->getUserDetails();
+
+            return ApiResponseService::success(
+                ['user' => $result['user']],
+                'User profile retrieved successfully'
+            );
+
+        } catch (TokenExpiredException $e) {
+            return ApiResponseService::unauthorized($e->getMessage());
+        } catch (TokenInvalidException $e) {
+            return ApiResponseService::unauthorized($e->getMessage());
+        } catch (\Exception $e) {
+            return ApiResponseService::serverError($e->getMessage());
         }
-
-        return $this->createNewToken($token);
     }
 
     /**
-     * Log the user out (Invalidate the token).
+     * Logout user (invalidate token)
      */
-    public function logout()
+    public function logout(Request $request)
     {
-        auth()->logout(); // This invalidates the token
-        return response()->json(['message' => 'User successfully signed out']);
+        try {
+            // Validate token first
+            $this->authService->validateToken($request->bearerToken());
+
+            // Logout
+            $result = $this->authService->logoutUser();
+
+            return ApiResponseService::success(
+                null,
+                $result['message']
+            );
+
+        } catch (TokenExpiredException $e) {
+            return ApiResponseService::unauthorized($e->getMessage());
+        } catch (TokenInvalidException $e) {
+            return ApiResponseService::unauthorized($e->getMessage());
+        } catch (\Exception $e) {
+            return ApiResponseService::serverError($e->getMessage());
+        }
     }
 
     /**
-     * Refresh a token.
-     * This creates a new token and invalidates the old one.
+     * Refresh JWT token
      */
-    public function refresh()
+    public function refresh(Request $request)
     {
-        return $this->createNewToken(auth()->refresh());
-    }
+        try {
+            // Validate token first
+            $this->authService->validateToken($request->bearerToken());
 
-    /**
-     * Get the authenticated User.
-     */
-    public function me()
-    {
-        return response()->json(auth()->user());
-    }
+            // Refresh token
+            $result = $this->authService->refreshToken();
 
-    /**
-     * Get the token array structure.
-     */
-    protected function createNewToken($token)
-    {
-        return response()->json([
-            'access_token' => $token,
-            'token_type' => 'bearer',
-            'expires_in' => auth()->factory()->getTTL() * 60, // Time in seconds
-            'user' => auth()->user()
-        ]);
+            $tokenData = $this->authService->formatTokenResponse($result['token']);
+
+            return ApiResponseService::success(
+                $tokenData,
+                'Token refreshed successfully'
+            );
+
+        } catch (TokenExpiredException $e) {
+            return ApiResponseService::unauthorized($e->getMessage());
+        } catch (TokenInvalidException $e) {
+            return ApiResponseService::unauthorized($e->getMessage());
+        } catch (\Exception $e) {
+            return ApiResponseService::serverError($e->getMessage());
+        }
     }
 }
