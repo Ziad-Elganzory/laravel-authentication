@@ -178,12 +178,9 @@ class AuthController extends Controller
             new OA\Response(response: 401, description: "Unauthorized - Invalid or expired token")
         ]
     )]
-    public function me(Request $request)
+    public function me()
     {
         try {
-            // Validate token first
-            $this->authService->validateToken($request->bearerToken());
-
             // Get user details
             $result = $this->authService->getUserDetails();
 
@@ -191,11 +188,6 @@ class AuthController extends Controller
                 ['user' => $result['user']],
                 'User profile retrieved successfully'
             );
-
-        } catch (TokenExpiredException $e) {
-            return ApiResponseService::unauthorized($e->getMessage());
-        } catch (TokenInvalidException $e) {
-            return ApiResponseService::unauthorized($e->getMessage());
         } catch (\Exception $e) {
             return ApiResponseService::serverError($e->getMessage());
         }
@@ -223,9 +215,6 @@ class AuthController extends Controller
     public function logout(Request $request)
     {
         try {
-            // Validate token first
-            $this->authService->validateToken($request->bearerToken());
-
             // Logout
             $result = $this->authService->logoutUser();
 
@@ -233,11 +222,6 @@ class AuthController extends Controller
                 null,
                 $result['message']
             );
-
-        } catch (TokenExpiredException $e) {
-            return ApiResponseService::unauthorized($e->getMessage());
-        } catch (TokenInvalidException $e) {
-            return ApiResponseService::unauthorized($e->getMessage());
         } catch (\Exception $e) {
             return ApiResponseService::serverError($e->getMessage());
         }
@@ -271,12 +255,9 @@ class AuthController extends Controller
             new OA\Response(response: 401, description: "Unauthorized - Invalid or expired token")
         ]
     )]
-    public function refresh(Request $request)
+    public function refresh()
     {
         try {
-            // Validate token first
-            $this->authService->validateToken($request->bearerToken());
-
             // Refresh token
             $result = $this->authService->refreshToken();
 
@@ -286,11 +267,6 @@ class AuthController extends Controller
                 $tokenData,
                 'Token refreshed successfully'
             );
-
-        } catch (TokenExpiredException $e) {
-            return ApiResponseService::unauthorized($e->getMessage());
-        } catch (TokenInvalidException $e) {
-            return ApiResponseService::unauthorized($e->getMessage());
         } catch (\Exception $e) {
             return ApiResponseService::serverError($e->getMessage());
         }

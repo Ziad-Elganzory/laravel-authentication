@@ -143,39 +143,6 @@ class AuthService
     }
 
     /**
-     * Validate the JWT token
-     *
-     * @param string|null $token
-     * @return array
-     * @throws TokenExpiredException
-     * @throws TokenInvalidException
-     * @throws \Exception
-     */
-    public function validateToken(?string $token): array
-    {
-        try {
-            if (!$token) {
-                throw new \Exception('Token not provided');
-            }
-
-            // Set the token and authenticate
-            JWTAuth::setToken($token)->authenticate();
-
-            return [
-                'success' => true,
-                'valid' => true
-            ];
-
-        } catch (TokenExpiredException $e) {
-            throw new TokenExpiredException('Token has expired. Please login again.');
-        } catch (TokenInvalidException $e) {
-            throw new TokenInvalidException('Token is invalid. Please login again.');
-        } catch (JWTException $e) {
-            throw new \Exception('Token error: ' . $e->getMessage());
-        }
-    }
-
-    /**
      * Format token response
      *
      * @param string $token
