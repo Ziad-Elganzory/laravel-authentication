@@ -44,7 +44,6 @@ This project demonstrates a complete JWT authentication system built with Larave
 - **MySQL** - Database
 - **JWT (php-open-source-saver/jwt-auth)** - JSON Web Token Authentication
 - **L5-Swagger** - API Documentation
-- **Sanctum** - API Token Authentication (Laravel default)
 
 ## 🚀 Getting Started
 
